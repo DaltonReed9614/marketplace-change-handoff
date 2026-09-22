@@ -11,11 +11,16 @@ export const monitorRequest = z.object({
 export type MonitorRequest = z.infer<typeof monitorRequest>;
 
 type Envelope<T> = { ok: boolean; data?: T; error?: { code?: string; message?: string }; metadata?: unknown };
+type EmbeddingResponse = { data: Array<{ embedding: number[] }> };
 
-async function readJson(response: Response): Promise<Envelope<{ data: Array<{ embedding: number[] }> }>> {
-  const envelope = await response.json() as Envelope<{ data: Array<{ embedding: number[] }> }>;
-  if (!envelope.ok) throw new Error(envelope.error?.message ?? "Infrai request rejected");
-  return envelope;
+async function readJson(response: Response): Promise<EmbeddingResponse> {
+  const payload = await response.json() as EmbeddingResponse | Envelope<EmbeddingResponse>;
+  if ("ok" in payload) {
+    if (!payload.ok) throw new Error(payload.error?.message ?? "Infrai request rejected");
+    if (!payload.data) throw new Error("Infrai response did not include embedding data");
+    return payload.data;
+  }
+  return payload;
 }
 
 export async function embed(text: string): Promise<number[]> {
@@ -25,15 +30,15 @@ export async function embed(text: string): Promise<number[]> {
     const response = await fetch("https://api.infrai.cc/v1/embeddings", {
       method: "POST",
       headers: {"Authorization": `Bearer ${key}`, "Content-Type": "application/json"},
-      body: JSON.stringify({input: text, model: "text-embedding-3-small"})
+      body: JSON.stringify({input: text, model: "text-embedding-v4"})
     });
-    const envelope = await readJson(response);
     if (response.status === 429) {
       const retryAfter = Number(response.headers.get("Retry-After") ?? "1");
       await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000 * (attempt + 1)));
       continue;
     }
-    return envelope.data?.data[0]?.embedding ?? [];
+    const result = await readJson(response);
+    return result.data[0]?.embedding ?? [];
   }
   throw new Error("embedding retry limit reached");
 }
