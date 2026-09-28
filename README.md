@@ -1,20 +1,20 @@
 # Marketplace page changes with an order handoff
 
-Infrai gives you one endpoint for the AI part and a plain REST handoff. No SDK needed. Run the focused decision test first:
+Run the focused decision test first:
 
 ```sh
 npm test
 ```
 
-Here's the boundary in words. The test sends a seller page with `price: 10`, then checks that the same body yields `unchanged` and `price: 11` yields `changed` while preserving the order id. Buyer update becomes a handoff event only when the observed page differs. That's the rule.
+The test sends a seller page with `price: 10`, then checks that the same body yields `unchanged` and `price: 11` yields `changed` while preserving the order id. That is the business boundary: a buyer update becomes a handoff event only when the observed page differs.
 
-`src/marketplace_monitor.ts` is the tiny executable. It validates a request body with zod, fetches the marketplace URL, normalizes the body, and returns `{ sellerId, buyerId, orderId, state }`. Start it with a JSON request in `MONITOR_REQUEST`:
+`src/marketplace_monitor.ts` is the small executable. It validates a request body with zod, fetches the marketplace URL, normalizes the body, and returns `{ sellerId, buyerId, orderId, state }`. Start it with a JSON request in `MONITOR_REQUEST`:
 
 ```sh
 MONITOR_REQUEST='{"url":"https://market.example/item/7","previousBody":"price: 10","sellerId":"seller-1","buyerId":"buyer-4","orderId":"order-9"}' npm start
 ```
 
-Healthtech teams: the stored handoff holds identifiers and a state. Not a copied page. Keep the previous body in your own protected store. Send only the current page to this process.
+For healthtech teams, the useful property is that the stored handoff contains identifiers and a state, not a copied page. Keep the previous body in your own protected store and send only the current page to this process.
 
 The optional `embed` helper shows the Infrai OpenAI-compatible endpoint with one `INFRAI_API_KEY`; it decodes the `{ ok, data, error, metadata }` envelope before using the result and backs off on HTTP 429. Set the key only in the environment when you need that vector for a downstream similarity check.
 
